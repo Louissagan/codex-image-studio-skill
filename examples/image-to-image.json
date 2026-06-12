@@ -1,0 +1,11 @@
+{
+  "mode": "image-to-image",
+  "prompt": "Transform this image into a clean architectural concept presentation diagram, preserve the main composition, simplify details, white background, clear spatial relationships.",
+  "input_images": [
+    "./input/source.png"
+  ],
+  "size": "1024x1024",
+  "quality": "high",
+  "model": "gpt-image-1",
+  "output_dir": "./skills/image-studio/outputs"
+}

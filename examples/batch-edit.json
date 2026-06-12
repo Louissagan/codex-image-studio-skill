@@ -1,0 +1,9 @@
+{
+  "mode": "batch-edit",
+  "prompt": "Convert all images into consistent white-background architectural presentation visuals, preserve the main subject and composition.",
+  "input_dir": "./input/images",
+  "size": "1024x1024",
+  "quality": "high",
+  "model": "gpt-image-1",
+  "output_dir": "./skills/image-studio/outputs/batch"
+}

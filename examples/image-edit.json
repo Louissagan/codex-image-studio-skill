@@ -1,0 +1,12 @@
+{
+  "mode": "image-edit",
+  "prompt": "Replace the background with a clean white presentation board style, preserve the main subject, improve visual clarity.",
+  "input_images": [
+    "./input/source.png"
+  ],
+  "mask": null,
+  "size": "1024x1024",
+  "quality": "high",
+  "model": "gpt-image-1",
+  "output_dir": "./skills/image-studio/outputs"
+}

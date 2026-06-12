@@ -1,0 +1,8 @@
+{
+  "mode": "text-to-image",
+  "prompt": "Architectural concept sketch of a compact outdoor light festival installation at night, four projection screens around a small central light sculpture, clear circulation paths, clean concept board style, subtle glow, not realistic rendering.",
+  "size": "1024x1024",
+  "quality": "high",
+  "model": "gpt-image-1",
+  "output_dir": "./skills/image-studio/outputs"
+}
