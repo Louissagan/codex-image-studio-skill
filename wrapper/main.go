@@ -22,6 +22,12 @@ import (
 	"time"
 )
 
+const (
+	providerAuto       = "auto"
+	providerOpenAI     = "openai"
+	providerRunningHub = "runninghub"
+)
+
 type stringList []string
 
 func (s *stringList) String() string {
@@ -37,12 +43,15 @@ func (s *stringList) Set(value string) error {
 }
 
 type config struct {
+	Provider       string
 	Mode           string
 	Prompt         string
 	Inputs         []string
 	Mask           string
 	Size           string
 	Quality        string
+	AspectRatio    string
+	Resolution     string
 	Model          string
 	BaseURL        string
 	APIKey         string
@@ -51,25 +60,29 @@ type config struct {
 	Raw            bool
 	TimeoutSeconds int
 	MaxRetries     int
+	RunningHubWait int
 	TaskID         string
 }
 
 type metadata struct {
-	TaskID          string        `json:"task_id"`
-	Mode            string        `json:"mode"`
-	Prompt          string        `json:"prompt"`
-	InputImages     []string      `json:"input_images"`
-	Mask            *string       `json:"mask"`
-	Model           string        `json:"model"`
-	Size            string        `json:"size"`
-	Quality         string        `json:"quality"`
-	BaseURL         string        `json:"base_url"`
-	OutputImages    []string      `json:"output_images"`
-	RawResponsePath string        `json:"raw_response_path"`
-	LogPath         string        `json:"log_path"`
-	CreatedAt       string        `json:"created_at"`
-	Status          string        `json:"status"`
-	Error           *metadataErr  `json:"error"`
+	TaskID          string       `json:"task_id"`
+	Provider        string       `json:"provider"`
+	Mode            string       `json:"mode"`
+	Prompt          string       `json:"prompt"`
+	InputImages     []string     `json:"input_images"`
+	Mask            *string      `json:"mask"`
+	Model           string       `json:"model"`
+	Size            string       `json:"size"`
+	Quality         string       `json:"quality"`
+	BaseURL         string       `json:"base_url"`
+	UpstreamTaskID  string       `json:"upstream_task_id,omitempty"`
+	OutputURL       string       `json:"output_url,omitempty"`
+	OutputImages    []string     `json:"output_images"`
+	RawResponsePath string       `json:"raw_response_path"`
+	LogPath         string       `json:"log_path"`
+	CreatedAt       string       `json:"created_at"`
+	Status          string       `json:"status"`
+	Error           *metadataErr `json:"error"`
 }
 
 type metadataErr struct {
@@ -90,9 +103,11 @@ type imageResponse struct {
 }
 
 type requestResult struct {
-	ImageBytes []byte
-	RawBody    []byte
-	StatusCode int
+	ImageBytes     []byte
+	RawBody        []byte
+	StatusCode     int
+	UpstreamTaskID string
+	OutputURL      string
 }
 
 func main() {
@@ -132,6 +147,7 @@ func run() error {
 
 	meta := metadata{
 		TaskID:          cfg.TaskID,
+		Provider:        cfg.Provider,
 		Mode:            metadataMode(cfg.Mode),
 		Prompt:          cfg.Prompt,
 		InputImages:     cfg.Inputs,
@@ -183,6 +199,8 @@ func run() error {
 	}
 
 	meta.Status = "success"
+	meta.UpstreamTaskID = result.UpstreamTaskID
+	meta.OutputURL = result.OutputURL
 	meta.OutputImages = []string{paths.ImagePath}
 	meta.Error = nil
 	writeMetadataIfEnabled(cfg, paths.MetadataPath, meta, logLine)
@@ -196,12 +214,15 @@ func run() error {
 func parseFlags() config {
 	var inputs stringList
 	cfg := config{}
+	flag.StringVar(&cfg.Provider, "provider", "", "auto | openai | runninghub")
 	flag.StringVar(&cfg.Mode, "mode", "", "generate | edit")
 	flag.StringVar(&cfg.Prompt, "prompt", "", "prompt text or edit instructions")
 	flag.Var(&inputs, "input", "source image path for edit mode; may be repeated")
 	flag.StringVar(&cfg.Mask, "mask", "", "optional mask image path")
 	flag.StringVar(&cfg.Size, "size", "", "image size, default from IMAGE_STUDIO_DEFAULT_SIZE")
 	flag.StringVar(&cfg.Quality, "quality", "", "image quality, default from IMAGE_STUDIO_DEFAULT_QUALITY")
+	flag.StringVar(&cfg.AspectRatio, "aspect-ratio", "", "Running Hub aspectRatio override, e.g. 16:9")
+	flag.StringVar(&cfg.Resolution, "resolution", "", "Running Hub resolution override, e.g. 1k")
 	flag.StringVar(&cfg.Model, "model", "", "image model, default from IMAGE_STUDIO_IMAGE_MODEL")
 	flag.StringVar(&cfg.BaseURL, "base-url", "", "OpenAI-compatible base URL")
 	flag.StringVar(&cfg.APIKey, "api-key", "", "API key")
@@ -210,6 +231,7 @@ func parseFlags() config {
 	flag.BoolVar(&cfg.Raw, "raw", true, "write raw response")
 	flag.IntVar(&cfg.TimeoutSeconds, "timeout", 0, "request timeout seconds")
 	flag.IntVar(&cfg.MaxRetries, "max-retries", -1, "retry count after first attempt")
+	flag.IntVar(&cfg.RunningHubWait, "runninghub-max-wait", 0, "Running Hub total poll wait seconds")
 	flag.StringVar(&cfg.TaskID, "task-id", "", "optional task id override")
 	flag.Parse()
 	cfg.Inputs = inputs
@@ -232,29 +254,57 @@ func (c *config) applyDefaults() error {
 		return errors.New("输入图片不存在，请检查 --input 或 --input-dir。")
 	}
 
+	c.Provider = strings.ToLower(strings.TrimSpace(firstNonEmpty(c.Provider, os.Getenv("IMAGE_STUDIO_PROVIDER"), providerAuto)))
 	c.BaseURL = strings.TrimSpace(firstNonEmpty(c.BaseURL, os.Getenv("IMAGE_STUDIO_BASE_URL")))
 	if c.BaseURL == "" {
 		return errors.New("missing IMAGE_STUDIO_BASE_URL")
 	}
-	baseURL, err := normalizeBaseURL(c.BaseURL)
+	provider, err := resolveProvider(c.Provider, c.BaseURL)
+	if err != nil {
+		return err
+	}
+	c.Provider = provider
+	baseURL, err := normalizeBaseURL(c.BaseURL, c.Provider)
 	if err != nil {
 		return err
 	}
 	c.BaseURL = baseURL
 
 	c.APIKey = strings.TrimSpace(firstNonEmpty(c.APIKey, os.Getenv("IMAGE_STUDIO_API_KEY")))
-	if c.APIKey == "" || c.APIKey == "replace_with_your_api_key" {
+	if c.Provider == providerRunningHub && (c.APIKey == "" || strings.HasPrefix(c.APIKey, "replace_with_")) {
+		c.APIKey = strings.TrimSpace(os.Getenv("RUNNINGHUB_API_KEY"))
+	}
+	if c.APIKey == "" || strings.HasPrefix(c.APIKey, "replace_with_") {
 		return errors.New("missing IMAGE_STUDIO_API_KEY")
 	}
-	c.Model = strings.TrimSpace(firstNonEmpty(c.Model, os.Getenv("IMAGE_STUDIO_IMAGE_MODEL"), "gpt-image-1"))
-	c.Size = strings.TrimSpace(firstNonEmpty(c.Size, os.Getenv("IMAGE_STUDIO_DEFAULT_SIZE"), "1024x1024"))
-	c.Quality = strings.TrimSpace(firstNonEmpty(c.Quality, os.Getenv("IMAGE_STUDIO_DEFAULT_QUALITY"), "high"))
+	c.Size = strings.TrimSpace(firstNonEmpty(c.Size, os.Getenv("IMAGE_STUDIO_DEFAULT_SIZE")))
+	c.Quality = strings.TrimSpace(firstNonEmpty(c.Quality, os.Getenv("IMAGE_STUDIO_DEFAULT_QUALITY")))
+	c.AspectRatio = strings.TrimSpace(firstNonEmpty(c.AspectRatio, os.Getenv("IMAGE_STUDIO_RUNNINGHUB_ASPECT_RATIO")))
+	c.Resolution = strings.TrimSpace(firstNonEmpty(c.Resolution, os.Getenv("IMAGE_STUDIO_RUNNINGHUB_RESOLUTION")))
+	if c.Provider == providerOpenAI {
+		c.Model = strings.TrimSpace(firstNonEmpty(c.Model, os.Getenv("IMAGE_STUDIO_IMAGE_MODEL")))
+		c.Model = strings.TrimSpace(firstNonEmpty(c.Model, "gpt-image-1"))
+		c.Size = strings.TrimSpace(firstNonEmpty(c.Size, "1024x1024"))
+		c.Quality = strings.TrimSpace(firstNonEmpty(c.Quality, "high"))
+	} else {
+		if c.Mode == "generate" {
+			c.Model = strings.TrimSpace(firstNonEmpty(c.Model, os.Getenv("IMAGE_STUDIO_RUNNINGHUB_TEXT_MODEL"), os.Getenv("IMAGE_STUDIO_IMAGE_MODEL"), runningHubGPTImage2TextEndpoint))
+		} else {
+			c.Model = strings.TrimSpace(firstNonEmpty(c.Model, os.Getenv("IMAGE_STUDIO_RUNNINGHUB_EDIT_MODEL"), os.Getenv("IMAGE_STUDIO_IMAGE_MODEL"), runningHubGPTImage2EditEndpoint))
+		}
+		if c.Model == "" || c.Model == "gpt-image-1" {
+			return errors.New("Running Hub mode requires an allowed gpt-image-2 endpoint or a SKU id that resolves to one")
+		}
+	}
 	c.OutputDir = strings.TrimSpace(firstNonEmpty(c.OutputDir, os.Getenv("IMAGE_STUDIO_OUTPUT_DIR"), "./skills/image-studio/outputs"))
 	if c.TimeoutSeconds <= 0 {
 		c.TimeoutSeconds = intEnv("IMAGE_STUDIO_TIMEOUT_SECONDS", 300)
 	}
 	if c.MaxRetries < 0 {
 		c.MaxRetries = intEnv("IMAGE_STUDIO_MAX_RETRIES", 2)
+	}
+	if c.RunningHubWait <= 0 {
+		c.RunningHubWait = intEnv("IMAGE_STUDIO_RUNNINGHUB_MAX_WAIT_SECONDS", 1800)
 	}
 
 	for _, input := range c.Inputs {
@@ -311,13 +361,20 @@ func preparePaths(cfg config) (outputPaths, error) {
 }
 
 func requestWithRetries(cfg config, logLine func(string, ...any)) (requestResult, error) {
+	if cfg.Provider == providerRunningHub {
+		logLine("provider=runninghub model=%s max_wait=%d", cfg.Model, cfg.RunningHubWait)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.RunningHubWait)*time.Second)
+		defer cancel()
+		return requestOnce(ctx, cfg, logLine)
+	}
+
 	var last requestResult
 	var lastErr error
 	attempts := cfg.MaxRetries + 1
 	for attempt := 1; attempt <= attempts; attempt++ {
 		logLine("attempt %d/%d mode=%s model=%s size=%s quality=%s", attempt, attempts, cfg.Mode, cfg.Model, cfg.Size, cfg.Quality)
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.TimeoutSeconds)*time.Second)
-		result, err := requestOnce(ctx, cfg)
+		result, err := requestOnce(ctx, cfg, logLine)
 		cancel()
 		last = result
 		if err == nil {
@@ -333,7 +390,10 @@ func requestWithRetries(cfg config, logLine func(string, ...any)) (requestResult
 	return last, lastErr
 }
 
-func requestOnce(ctx context.Context, cfg config) (requestResult, error) {
+func requestOnce(ctx context.Context, cfg config, logLine func(string, ...any)) (requestResult, error) {
+	if cfg.Provider == providerRunningHub {
+		return requestRunningHub(ctx, cfg, logLine)
+	}
 	if cfg.Mode == "edit" {
 		return requestEdit(ctx, cfg)
 	}
@@ -509,7 +569,26 @@ func classifyError(status int, err error, raw []byte) metadataErr {
 	}
 }
 
-func normalizeBaseURL(raw string) (string, error) {
+func resolveProvider(rawProvider string, rawBaseURL string) (string, error) {
+	provider := strings.ToLower(strings.TrimSpace(rawProvider))
+	if provider == "" {
+		provider = providerAuto
+	}
+	switch provider {
+	case providerOpenAI, providerRunningHub:
+		return provider, nil
+	case providerAuto:
+		baseURL := strings.ToLower(strings.TrimSpace(rawBaseURL))
+		if strings.Contains(baseURL, "runninghub") {
+			return providerRunningHub, nil
+		}
+		return providerOpenAI, nil
+	default:
+		return "", fmt.Errorf("IMAGE_STUDIO_PROVIDER must be auto, openai, or runninghub; got %q", rawProvider)
+	}
+}
+
+func normalizeBaseURL(raw string, provider string) (string, error) {
 	cleaned := strings.TrimRight(strings.TrimSpace(raw), "/")
 	if cleaned == "" {
 		return "", errors.New("未配置上游 BASE_URL")
@@ -523,6 +602,15 @@ func normalizeBaseURL(raw string) (string, error) {
 	}
 	if !strings.EqualFold(u.Scheme, "http") && !strings.EqualFold(u.Scheme, "https") {
 		return "", errors.New("BASE_URL 仅支持 http:// 或 https://")
+	}
+	if provider == providerRunningHub {
+		if strings.Contains(strings.ToLower(u.Hostname()), "runninghub") {
+			return u.Scheme + "://" + u.Host, nil
+		}
+		for strings.HasSuffix(cleaned, "/openapi/v2") {
+			cleaned = strings.TrimRight(strings.TrimSuffix(cleaned, "/openapi/v2"), "/")
+		}
+		return cleaned, nil
 	}
 	if !strings.HasSuffix(cleaned, "/v1") {
 		cleaned += "/v1"

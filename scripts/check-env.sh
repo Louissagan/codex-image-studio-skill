@@ -15,7 +15,7 @@ check_nonempty() {
   if [[ -z "$value" ]]; then
     printf 'FAIL %s is not set\n' "$name" >&2
     status=1
-  elif [[ "$name" == "IMAGE_STUDIO_API_KEY" && "$value" == "replace_with_your_api_key" ]]; then
+  elif [[ "$name" == "IMAGE_STUDIO_API_KEY" && "$value" == replace_with_* ]]; then
     printf 'FAIL %s still uses the example placeholder\n' "$name" >&2
     status=1
   else
@@ -25,8 +25,41 @@ check_nonempty() {
 
 check_nonempty IMAGE_STUDIO_BASE_URL
 check_nonempty IMAGE_STUDIO_API_KEY
-check_nonempty IMAGE_STUDIO_IMAGE_MODEL
+check_nonempty IMAGE_STUDIO_PROVIDER
 check_nonempty IMAGE_STUDIO_OUTPUT_DIR
+
+case "$(printf '%s' "$IMAGE_STUDIO_PROVIDER" | tr '[:upper:]' '[:lower:]')" in
+  auto|openai|runninghub)
+    printf 'OK   IMAGE_STUDIO_PROVIDER value is supported\n'
+    ;;
+  *)
+    printf 'FAIL IMAGE_STUDIO_PROVIDER must be auto, openai, or runninghub\n' >&2
+    status=1
+    ;;
+esac
+
+if image_studio_is_runninghub; then
+  printf 'OK   Running Hub mode detected\n'
+  check_nonempty IMAGE_STUDIO_RUNNINGHUB_TEXT_MODEL
+  check_nonempty IMAGE_STUDIO_RUNNINGHUB_EDIT_MODEL
+  if [[ "$IMAGE_STUDIO_RUNNINGHUB_TEXT_MODEL" != "/rhart-image-g-2-official/text-to-image" ]]; then
+    printf 'FAIL IMAGE_STUDIO_RUNNINGHUB_TEXT_MODEL must be /rhart-image-g-2-official/text-to-image\n' >&2
+    status=1
+  else
+    printf 'OK   IMAGE_STUDIO_RUNNINGHUB_TEXT_MODEL=%s\n' "$IMAGE_STUDIO_RUNNINGHUB_TEXT_MODEL"
+  fi
+  if [[ "$IMAGE_STUDIO_RUNNINGHUB_EDIT_MODEL" != "/rhart-image-g-2/image-to-image" ]]; then
+    printf 'FAIL IMAGE_STUDIO_RUNNINGHUB_EDIT_MODEL must be /rhart-image-g-2/image-to-image\n' >&2
+    status=1
+  else
+    printf 'OK   IMAGE_STUDIO_RUNNINGHUB_EDIT_MODEL=%s\n' "$IMAGE_STUDIO_RUNNINGHUB_EDIT_MODEL"
+  fi
+  [[ -n "${IMAGE_STUDIO_RUNNINGHUB_ASPECT_RATIO:-}" ]] && printf 'OK   IMAGE_STUDIO_RUNNINGHUB_ASPECT_RATIO=%s\n' "$IMAGE_STUDIO_RUNNINGHUB_ASPECT_RATIO"
+  [[ -n "${IMAGE_STUDIO_RUNNINGHUB_RESOLUTION:-}" ]] && printf 'OK   IMAGE_STUDIO_RUNNINGHUB_RESOLUTION=%s\n' "$IMAGE_STUDIO_RUNNINGHUB_RESOLUTION"
+  printf 'OK   IMAGE_STUDIO_RUNNINGHUB_MAX_WAIT_SECONDS=%s\n' "$IMAGE_STUDIO_RUNNINGHUB_MAX_WAIT_SECONDS"
+else
+  check_nonempty IMAGE_STUDIO_IMAGE_MODEL
+fi
 
 if [[ -x "$BIN_PATH" ]]; then
   printf 'OK   CLI binary: %s\n' "$BIN_PATH"

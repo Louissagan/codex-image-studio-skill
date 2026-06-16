@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ " ${*:-} " == *" --help "* || " ${*:-} " == *" -h "* ]]; then
   cat <<'USAGE'
-Usage: bash skills/image-studio/scripts/batch-edit-image.sh --prompt "..." --input-dir ./input/images [--output-dir ./skills/image-studio/outputs/batch]
+Usage: bash skills/image-studio/scripts/batch-edit-image.sh --prompt "..." --input-dir ./input/images [--model /rhart-image-g-2/image-to-image] [--aspect-ratio 16:9] [--resolution 1k] [--output-dir ./skills/image-studio/outputs/batch]
 USAGE
   exit 0
 fi
@@ -21,7 +21,12 @@ input_dir=""
 size="$IMAGE_STUDIO_DEFAULT_SIZE"
 quality="$IMAGE_STUDIO_DEFAULT_QUALITY"
 model="$IMAGE_STUDIO_IMAGE_MODEL"
+if image_studio_is_runninghub; then
+  model="$IMAGE_STUDIO_RUNNINGHUB_EDIT_MODEL"
+fi
 output_dir="$IMAGE_STUDIO_OUTPUT_DIR/batch"
+aspect_ratio="$IMAGE_STUDIO_RUNNINGHUB_ASPECT_RATIO"
+resolution="$IMAGE_STUDIO_RUNNINGHUB_RESOLUTION"
 metadata="true"
 raw="true"
 
@@ -31,6 +36,8 @@ while [[ $# -gt 0 ]]; do
     --input-dir) input_dir="${2:-}"; shift 2 ;;
     --size) size="${2:-}"; shift 2 ;;
     --quality) quality="${2:-}"; shift 2 ;;
+    --aspect-ratio) aspect_ratio="${2:-}"; shift 2 ;;
+    --resolution) resolution="${2:-}"; shift 2 ;;
     --model) model="${2:-}"; shift 2 ;;
     --output-dir) output_dir="${2:-}"; shift 2 ;;
     --metadata) metadata="true"; shift ;;
@@ -39,7 +46,7 @@ while [[ $# -gt 0 ]]; do
     --no-raw) raw="false"; shift ;;
     -h|--help)
       cat <<'USAGE'
-Usage: bash skills/image-studio/scripts/batch-edit-image.sh --prompt "..." --input-dir ./input/images [--output-dir ./skills/image-studio/outputs/batch]
+Usage: bash skills/image-studio/scripts/batch-edit-image.sh --prompt "..." --input-dir ./input/images [--model /rhart-image-g-2/image-to-image] [--aspect-ratio 16:9] [--resolution 1k] [--output-dir ./skills/image-studio/outputs/batch]
 USAGE
       exit 0
       ;;
@@ -65,20 +72,29 @@ batch_log="$resolved_output/logs/batch-$(date +%Y%m%d-%H%M%S).log"
 : > "$batch_log"
 
 while IFS= read -r image; do
-  if "$BIN_PATH" \
-    --mode edit \
-    --prompt "$prompt" \
-    --input "$image" \
-    --size "$size" \
-    --quality "$quality" \
-    --model "$model" \
-    --base-url "$IMAGE_STUDIO_BASE_URL" \
-    --api-key "$IMAGE_STUDIO_API_KEY" \
-    --output-dir "$resolved_output" \
-    --metadata="$metadata" \
-    --raw="$raw" \
-    --timeout "$IMAGE_STUDIO_TIMEOUT_SECONDS" \
-    --max-retries "$IMAGE_STUDIO_MAX_RETRIES" >> "$batch_log" 2>&1; then
+  args=(
+    --mode edit
+    --prompt "$prompt"
+    --input "$image"
+    --provider "$IMAGE_STUDIO_PROVIDER"
+    --model "$model"
+    --base-url "$IMAGE_STUDIO_BASE_URL"
+    --api-key "$IMAGE_STUDIO_API_KEY"
+    --output-dir "$resolved_output"
+    --metadata="$metadata"
+    --raw="$raw"
+    --timeout "$IMAGE_STUDIO_TIMEOUT_SECONDS"
+    --max-retries "$IMAGE_STUDIO_MAX_RETRIES"
+    --runninghub-max-wait "$IMAGE_STUDIO_RUNNINGHUB_MAX_WAIT_SECONDS"
+  )
+  if image_studio_is_runninghub; then
+    [[ -n "$aspect_ratio" ]] && args+=(--aspect-ratio "$aspect_ratio")
+    [[ -n "$resolution" ]] && args+=(--resolution "$resolution")
+  else
+    args+=(--size "$size" --quality "$quality")
+  fi
+
+  if "$BIN_PATH" "${args[@]}" >> "$batch_log" 2>&1; then
     success=$((success + 1))
   else
     failed=$((failed + 1))

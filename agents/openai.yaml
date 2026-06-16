@@ -1,4 +1,4 @@
 interface:
-  display_name: "Codex Image Studio"
-  short_description: "Call Image-Studio from Codex skills"
-  default_prompt: "Use $codex-image-studio-skill to generate or edit an image and return the saved image, metadata, and raw response paths."
+  display_name: "Image Studio"
+  short_description: "Generate/edit images via OpenAI or Running Hub"
+  default_prompt: "Use $image-studio to generate or edit an image through OpenAI-compatible or Running Hub APIs, then return the saved image, metadata, and raw response paths."

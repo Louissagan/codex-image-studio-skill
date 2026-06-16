@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ " ${*:-} " == *" --help "* || " ${*:-} " == *" -h "* ]]; then
   cat <<'USAGE'
-Usage: bash skills/image-studio/scripts/generate-image.sh --prompt "..." [--size 1024x1024] [--quality high] [--model gpt-image-1] [--output-dir ./skills/image-studio/outputs]
+Usage: bash skills/image-studio/scripts/generate-image.sh --prompt "..." [--size 1024x1024] [--quality high] [--model gpt-image-1|/rhart-image-g-2-official/text-to-image] [--aspect-ratio 16:9] [--resolution 1k] [--output-dir ./skills/image-studio/outputs]
 USAGE
   exit 0
 fi
@@ -20,7 +20,12 @@ prompt=""
 size="$IMAGE_STUDIO_DEFAULT_SIZE"
 quality="$IMAGE_STUDIO_DEFAULT_QUALITY"
 model="$IMAGE_STUDIO_IMAGE_MODEL"
+if image_studio_is_runninghub; then
+  model="$IMAGE_STUDIO_RUNNINGHUB_TEXT_MODEL"
+fi
 output_dir="$IMAGE_STUDIO_OUTPUT_DIR"
+aspect_ratio="$IMAGE_STUDIO_RUNNINGHUB_ASPECT_RATIO"
+resolution="$IMAGE_STUDIO_RUNNINGHUB_RESOLUTION"
 metadata="true"
 raw="true"
 
@@ -29,6 +34,8 @@ while [[ $# -gt 0 ]]; do
     --prompt) prompt="${2:-}"; shift 2 ;;
     --size) size="${2:-}"; shift 2 ;;
     --quality) quality="${2:-}"; shift 2 ;;
+    --aspect-ratio) aspect_ratio="${2:-}"; shift 2 ;;
+    --resolution) resolution="${2:-}"; shift 2 ;;
     --model) model="${2:-}"; shift 2 ;;
     --output-dir) output_dir="${2:-}"; shift 2 ;;
     --metadata) metadata="true"; shift ;;
@@ -37,7 +44,7 @@ while [[ $# -gt 0 ]]; do
     --no-raw) raw="false"; shift ;;
     -h|--help)
       cat <<'USAGE'
-Usage: bash skills/image-studio/scripts/generate-image.sh --prompt "..." [--size 1024x1024] [--quality high] [--model gpt-image-1] [--output-dir ./skills/image-studio/outputs]
+Usage: bash skills/image-studio/scripts/generate-image.sh --prompt "..." [--size 1024x1024] [--quality high] [--model gpt-image-1|/rhart-image-g-2-official/text-to-image] [--aspect-ratio 16:9] [--resolution 1k] [--output-dir ./skills/image-studio/outputs]
 USAGE
       exit 0
       ;;
@@ -53,16 +60,25 @@ fi
 resolved_output="$(resolve_output_dir "$output_dir")"
 ensure_output_tree "$resolved_output"
 
-"$BIN_PATH" \
-  --mode generate \
-  --prompt "$prompt" \
-  --size "$size" \
-  --quality "$quality" \
-  --model "$model" \
-  --base-url "$IMAGE_STUDIO_BASE_URL" \
-  --api-key "$IMAGE_STUDIO_API_KEY" \
-  --output-dir "$resolved_output" \
-  --metadata="$metadata" \
-  --raw="$raw" \
-  --timeout "$IMAGE_STUDIO_TIMEOUT_SECONDS" \
+args=(
+  --mode generate
+  --prompt "$prompt"
+  --provider "$IMAGE_STUDIO_PROVIDER"
+  --model "$model"
+  --base-url "$IMAGE_STUDIO_BASE_URL"
+  --api-key "$IMAGE_STUDIO_API_KEY"
+  --output-dir "$resolved_output"
+  --metadata="$metadata"
+  --raw="$raw"
+  --timeout "$IMAGE_STUDIO_TIMEOUT_SECONDS"
   --max-retries "$IMAGE_STUDIO_MAX_RETRIES"
+  --runninghub-max-wait "$IMAGE_STUDIO_RUNNINGHUB_MAX_WAIT_SECONDS"
+)
+if image_studio_is_runninghub; then
+  [[ -n "$aspect_ratio" ]] && args+=(--aspect-ratio "$aspect_ratio")
+  [[ -n "$resolution" ]] && args+=(--resolution "$resolution")
+else
+  args+=(--size "$size" --quality "$quality")
+fi
+
+"$BIN_PATH" "${args[@]}"
