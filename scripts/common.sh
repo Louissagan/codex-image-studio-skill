@@ -7,6 +7,7 @@ PROJECT_ROOT="$(cd "$SKILL_DIR/../.." && pwd)"
 BIN_PATH="$SKILL_DIR/bin/gptcodex-image"
 ENV_FILE="$SKILL_DIR/config/image-studio.env"
 EXAMPLE_ENV_FILE="$SKILL_DIR/config/image-studio.example.env"
+CONFIG_SCRIPT="$SKILL_DIR/scripts/configure-env.sh"
 
 load_image_studio_env() {
   local shell_base_url="${IMAGE_STUDIO_BASE_URL:-}"
@@ -116,18 +117,25 @@ ensure_output_tree() {
 require_binary() {
   if [[ ! -x "$BIN_PATH" ]]; then
     printf '缺少 Image Studio CLI: %s\n' "$BIN_PATH" >&2
-    printf '请先运行: bash skills/image-studio/scripts/install.sh\n' >&2
+    printf '请先运行: bash %s/scripts/install.sh\n' "$SKILL_DIR" >&2
     return 1
   fi
+}
+
+image_studio_is_placeholder() {
+  local value="${1:-}"
+  [[ -z "$value" || "$value" == replace_with_* || "$value" == *_HERE ]]
 }
 
 require_api_env() {
   if [[ -z "$IMAGE_STUDIO_BASE_URL" ]]; then
     printf '缺少 IMAGE_STUDIO_BASE_URL。请配置 %s\n' "$ENV_FILE" >&2
+    print_setup_hint >&2
     return 1
   fi
-  if [[ -z "$IMAGE_STUDIO_API_KEY" || "$IMAGE_STUDIO_API_KEY" == replace_with_* ]]; then
+  if image_studio_is_placeholder "$IMAGE_STUDIO_API_KEY"; then
     printf '缺少 IMAGE_STUDIO_API_KEY。请配置 %s\n' "$ENV_FILE" >&2
+    print_setup_hint >&2
     return 1
   fi
 }
@@ -136,4 +144,13 @@ print_config_hint() {
   printf 'Provider: %s\n' "${IMAGE_STUDIO_PROVIDER:-auto}"
   printf '独立配置文件: %s\n' "$ENV_FILE"
   printf '示例配置文件: %s\n' "$EXAMPLE_ENV_FILE"
+}
+
+print_setup_hint() {
+  printf 'Image Studio provider configuration is incomplete.\n'
+  printf 'Final API key location: %s\n' "$ENV_FILE"
+  printf 'Interactive setup wizard: bash %s\n' "$CONFIG_SCRIPT"
+  printf 'Manual template: cp %s %s\n' "$EXAMPLE_ENV_FILE" "$ENV_FILE"
+  printf 'Then edit the private env file: %s\n' "$ENV_FILE"
+  printf 'Then verify: bash %s/scripts/check-env.sh\n' "$SKILL_DIR"
 }

@@ -1,4 +1,4 @@
 interface:
   display_name: "Image Studio"
-  short_description: "Generate/edit images via OpenAI or Running Hub"
-  default_prompt: "Use $image-studio to generate or edit an image through OpenAI-compatible or Running Hub APIs, then return the saved image, metadata, and raw response paths."
+  short_description: "Generate/edit images via Running Hub or relays"
+  default_prompt: "Use $image-studio. First run its environment check and, if credentials are missing, guide me through scripts/configure-env.sh for Running Hub or an OpenAI-compatible relay. Then generate or edit the image and return the saved image, metadata, and raw response paths."

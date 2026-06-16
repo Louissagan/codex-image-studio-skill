@@ -8,6 +8,8 @@ WRAPPER_DIR="$SKILL_DIR/wrapper"
 BIN_DIR="$SKILL_DIR/bin"
 BIN_PATH="$BIN_DIR/gptcodex-image"
 THIRD_PARTY_DIR="$PROJECT_ROOT/third_party/Image-Studio"
+CONFIG_SCRIPT="$SKILL_DIR/scripts/configure-env.sh"
+CHECK_SCRIPT="$SKILL_DIR/scripts/check-env.sh"
 
 printf 'Image Studio Skill installer\n'
 
@@ -51,3 +53,28 @@ chmod +x "$BIN_PATH"
 printf 'Install complete.\n'
 printf 'Binary: %s\n' "$BIN_PATH"
 printf 'Check: %s --help\n' "$BIN_PATH"
+
+printf '\nChecking provider configuration...\n'
+if bash "$CHECK_SCRIPT"; then
+  printf 'Image Studio is configured and ready.\n'
+  exit 0
+fi
+
+printf '\nImage Studio needs provider configuration before first use.\n'
+printf 'Final API key location: %s/config/image-studio.env\n' "$SKILL_DIR"
+printf 'Recommended setup wizard: bash %s\n' "$CONFIG_SCRIPT"
+printf 'Manual template: cp %s/config/image-studio.example.env %s/config/image-studio.env\n' "$SKILL_DIR" "$SKILL_DIR"
+
+if [[ -t 0 && -t 1 ]]; then
+  printf 'Run the configuration wizard now? [Y/n] '
+  read -r answer
+  case "${answer:-Y}" in
+    y|Y|yes|YES|Yes)
+      bash "$CONFIG_SCRIPT"
+      bash "$CHECK_SCRIPT"
+      ;;
+    *)
+      printf 'Skipped configuration wizard. Run it later before generating images.\n'
+      ;;
+  esac
+fi

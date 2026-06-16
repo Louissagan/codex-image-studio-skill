@@ -4,6 +4,14 @@ Use this reference only when debugging Running Hub behavior or adding support fo
 
 ## Provider Config
 
+Use the setup wizard for normal installation:
+
+```bash
+bash skills/image-studio/scripts/configure-env.sh
+```
+
+The final API key location is the private file `skills/image-studio/config/image-studio.env`. Do not put real keys in `config/image-studio.example.env`.
+
 Set:
 
 ```env

@@ -1,6 +1,6 @@
 ---
 name: image-studio
-description: Generate, edit, transform, or batch-process images through a local Image-Studio CLI wrapper with OpenAI-compatible Images APIs or restricted Running Hub gpt-image-2 standard-model APIs. Use when Codex needs actual image output for text-to-image generation, image-to-image transformation, image editing with optional masks, multi-reference image generation, architectural/product/brand visual exploration, or batch image style conversion with structured saved images, logs, raw responses, and metadata.
+description: Generate, edit, transform, or batch-process images through a local Image-Studio CLI wrapper with OpenAI-compatible Images APIs or restricted Running Hub gpt-image-2 standard-model APIs. Use when Codex needs actual image output, first-use setup, provider/API-key configuration, environment validation, text-to-image generation, image-to-image transformation, image editing with optional masks, multi-reference image generation, architectural/product/brand visual exploration, or batch image style conversion with structured saved images, logs, raw responses, and metadata.
 ---
 
 # Image Studio Skill
@@ -21,18 +21,18 @@ Install or refresh the local CLI wrapper before first use:
 bash skills/image-studio/scripts/install.sh
 ```
 
-Create a private env file from the example, then fill in the API key and any upstream overrides:
+After install, guide the user through provider setup when `check-env.sh` reports missing values:
 
 ```bash
-cp skills/image-studio/config/image-studio.example.env skills/image-studio/config/image-studio.env
+bash skills/image-studio/scripts/configure-env.sh
 bash skills/image-studio/scripts/check-env.sh
 ```
 
-Never hardcode API keys. Prefer environment variables; the scripts also load `skills/image-studio/config/image-studio.env` when it exists.
+If the shell is not interactive, tell the user to copy `skills/image-studio/config/image-studio.example.env` to `skills/image-studio/config/image-studio.env`, edit the private file, then run `check-env.sh`. Never hardcode API keys. Prefer the private env file or shell environment variables; the scripts load `skills/image-studio/config/image-studio.env` when it exists.
 
 ## Provider Configuration
 
-The final place to fill any provider key is the private file `skills/image-studio/config/image-studio.env`. Never put a real key in `config/image-studio.example.env` or in this skill documentation.
+The final place to fill any provider key is the private file `skills/image-studio/config/image-studio.env`. The install/check scripts print this path, and `configure-env.sh` writes it directly. Never put a real key in `config/image-studio.example.env` or in this skill documentation.
 
 For an OpenAI-compatible relay provider (中转站), configure all of these in `image-studio.env`:
 

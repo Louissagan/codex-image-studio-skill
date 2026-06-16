@@ -1,4 +1,5 @@
 config/image-studio.env
+config/image-studio.env.backup.*
 bin/
 outputs/
 tmp/

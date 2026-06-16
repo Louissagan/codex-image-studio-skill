@@ -10,9 +10,18 @@ It does not launch the Image-Studio desktop app. It only uses command-line image
 bash skills/image-studio/scripts/install.sh
 ```
 
+The installer builds `skills/image-studio/bin/gptcodex-image`, runs an environment check, and points the user to the configuration wizard when credentials are missing. In an interactive terminal it can launch the wizard immediately.
+
 ## Configure
 
-Copy the example env file:
+Recommended interactive setup:
+
+```bash
+bash skills/image-studio/scripts/configure-env.sh
+bash skills/image-studio/scripts/check-env.sh
+```
+
+Manual setup:
 
 ```bash
 cp skills/image-studio/config/image-studio.example.env skills/image-studio/config/image-studio.env
@@ -29,10 +38,9 @@ skills/image-studio/config/image-studio.env
 Common required settings:
 
 ```env
-IMAGE_STUDIO_PROVIDER=auto
+IMAGE_STUDIO_PROVIDER=runninghub # or openai for relay / 中转站
 IMAGE_STUDIO_BASE_URL=
-IMAGE_STUDIO_API_KEY=
-IMAGE_STUDIO_IMAGE_MODEL=
+IMAGE_STUDIO_API_KEY=           # FINAL API KEY LOCATION / 最终填写 API key 的地方
 IMAGE_STUDIO_OUTPUT_DIR=
 ```
 
@@ -41,10 +49,14 @@ IMAGE_STUDIO_OUTPUT_DIR=
 For a relay API key, fill the relay block in `skills/image-studio/config/image-studio.env`:
 
 ```env
+# REQUIRED relay config / 中转站必填配置
 IMAGE_STUDIO_PROVIDER=openai
 IMAGE_STUDIO_BASE_URL=https://relay.example.com/v1
+# FINAL API KEY LOCATION / 最终填写中转站 API key 的地方
 IMAGE_STUDIO_API_KEY=replace_with_your_relay_api_key
 IMAGE_STUDIO_IMAGE_MODEL=gpt-image-1
+
+# Optional relay defaults / 中转站可选默认值
 IMAGE_STUDIO_DEFAULT_SIZE=1024x1024
 IMAGE_STUDIO_DEFAULT_QUALITY=high
 IMAGE_STUDIO_TIMEOUT_SECONDS=300
@@ -60,6 +72,7 @@ For a Running Hub API key, fill this block in `skills/image-studio/config/image-
 ```env
 IMAGE_STUDIO_PROVIDER=runninghub
 IMAGE_STUDIO_BASE_URL=https://www.runninghub.cn
+# FINAL API KEY LOCATION / 最终填写 Running Hub API key 的地方
 IMAGE_STUDIO_API_KEY=replace_with_your_runninghub_api_key
 IMAGE_STUDIO_RUNNINGHUB_TEXT_MODEL=/rhart-image-g-2-official/text-to-image
 IMAGE_STUDIO_RUNNINGHUB_EDIT_MODEL=/rhart-image-g-2/image-to-image
@@ -68,6 +81,8 @@ IMAGE_STUDIO_RUNNINGHUB_RESOLUTION=1k
 ```
 
 In Running Hub mode, `RUNNINGHUB_API_KEY` is also accepted when `IMAGE_STUDIO_API_KEY` is unset or still uses an example placeholder.
+
+Running Hub is intentionally limited to gpt-image-2 only: text-to-image uses `/rhart-image-g-2-official/text-to-image`, and image-to-image/editing uses `/rhart-image-g-2/image-to-image`.
 
 ## Check Environment
 

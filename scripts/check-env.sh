@@ -9,13 +9,19 @@ load_image_studio_env
 
 status=0
 
+if [[ -f "$ENV_FILE" ]]; then
+  printf 'OK   private env file exists: %s\n' "$ENV_FILE"
+else
+  printf 'WARN private env file is missing: %s\n' "$ENV_FILE" >&2
+fi
+
 check_nonempty() {
   local name="$1"
   local value="${!name:-}"
   if [[ -z "$value" ]]; then
     printf 'FAIL %s is not set\n' "$name" >&2
     status=1
-  elif [[ "$name" == "IMAGE_STUDIO_API_KEY" && "$value" == replace_with_* ]]; then
+  elif [[ "$name" == "IMAGE_STUDIO_API_KEY" ]] && image_studio_is_placeholder "$value"; then
     printf 'FAIL %s still uses the example placeholder\n' "$name" >&2
     status=1
   else
@@ -86,4 +92,8 @@ else
 fi
 
 print_config_hint
+if [[ "$status" -ne 0 ]]; then
+  printf '\n' >&2
+  print_setup_hint >&2
+fi
 exit "$status"
