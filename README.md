@@ -12,14 +12,29 @@ bash skills/image-studio/scripts/install.sh
 
 The installer builds `skills/image-studio/bin/gptcodex-image`, runs an environment check, and points the user to the configuration wizard when credentials are missing. In an interactive terminal it can launch the wizard immediately.
 
+It also bootstraps the local build environment:
+
+- Creates output directories and a private `config/image-studio.env` template when missing.
+- Installs or upgrades Go with Homebrew when Go is missing or older than the wrapper's `go.mod` requirement.
+- Builds the local wrapper binary.
+
+Automatic Go installation is enabled by default with `IMAGE_STUDIO_AUTO_INSTALL_GO=1`. On macOS, if Homebrew is missing, the installer stops with instructions unless you explicitly opt in:
+
+```bash
+IMAGE_STUDIO_AUTO_INSTALL_HOMEBREW=1 bash skills/image-studio/scripts/install.sh
+```
+
 ## Configure
 
 Recommended interactive setup:
 
 ```bash
+bash skills/image-studio/scripts/configure-env-gui.sh
 bash skills/image-studio/scripts/configure-env.sh
 bash skills/image-studio/scripts/check-env.sh
 ```
+
+On macOS/Codex desktop, prefer `configure-env-gui.sh`. It uses system dialogs, hides API key input, and stores API keys in macOS Keychain by default. Use `configure-env.sh` when you are in a real terminal and are OK with the key being written to the private env file.
 
 Manual setup:
 
@@ -27,7 +42,7 @@ Manual setup:
 cp skills/image-studio/config/image-studio.example.env skills/image-studio/config/image-studio.env
 ```
 
-The private `skills/image-studio/config/image-studio.env` file is the final place to put provider credentials. Do not put real keys in `config/image-studio.example.env`; that file is only a template for the open-source repo.
+The private `skills/image-studio/config/image-studio.env` file stores provider configuration. Prefer macOS Keychain for real API keys; in that mode the env file stores only Keychain pointers. Do not put real keys in `config/image-studio.example.env`; that file is only a template for the open-source repo.
 
 Edit:
 
@@ -40,7 +55,9 @@ Common required settings:
 ```env
 IMAGE_STUDIO_PROVIDER=runninghub # or openai for relay / 中转站
 IMAGE_STUDIO_BASE_URL=
-IMAGE_STUDIO_API_KEY=           # FINAL API KEY LOCATION / 最终填写 API key 的地方
+IMAGE_STUDIO_API_KEY_SOURCE=keychain
+IMAGE_STUDIO_KEYCHAIN_SERVICE=codex-image-studio
+IMAGE_STUDIO_KEYCHAIN_ACCOUNT=openai
 IMAGE_STUDIO_OUTPUT_DIR=
 ```
 
@@ -52,9 +69,11 @@ For a relay API key, fill the relay block in `skills/image-studio/config/image-s
 # REQUIRED relay config / 中转站必填配置
 IMAGE_STUDIO_PROVIDER=openai
 IMAGE_STUDIO_BASE_URL=https://relay.example.com/v1
-# FINAL API KEY LOCATION / 最终填写中转站 API key 的地方
-IMAGE_STUDIO_API_KEY=replace_with_your_relay_api_key
-IMAGE_STUDIO_IMAGE_MODEL=gpt-image-1
+# API key is stored in macOS Keychain, not in this file.
+IMAGE_STUDIO_API_KEY_SOURCE=keychain
+IMAGE_STUDIO_KEYCHAIN_SERVICE=codex-image-studio
+IMAGE_STUDIO_KEYCHAIN_ACCOUNT=openai
+IMAGE_STUDIO_IMAGE_MODEL=gpt-image-2
 
 # Optional relay defaults / 中转站可选默认值
 IMAGE_STUDIO_DEFAULT_SIZE=1024x1024
@@ -63,7 +82,7 @@ IMAGE_STUDIO_TIMEOUT_SECONDS=300
 IMAGE_STUDIO_MAX_RETRIES=2
 ```
 
-Replace `IMAGE_STUDIO_BASE_URL` with the relay service's OpenAI-compatible base URL, replace `IMAGE_STUDIO_API_KEY` with the relay key, and set `IMAGE_STUDIO_IMAGE_MODEL` to a model the relay actually exposes, such as `gpt-image-1` or the relay's documented image model. `IMAGE_STUDIO_OUTPUT_DIR` controls where generated images, metadata, raw responses, and logs are saved.
+Replace `IMAGE_STUDIO_BASE_URL` with the relay service's OpenAI-compatible base URL, store the relay key through the GUI wizard or shell environment, and set `IMAGE_STUDIO_IMAGE_MODEL` to a model the relay actually exposes, such as `gpt-image-2` or the relay's documented image model. `IMAGE_STUDIO_OUTPUT_DIR` controls where generated images, metadata, raw responses, and logs are saved.
 
 ### Running Hub
 
@@ -72,8 +91,10 @@ For a Running Hub API key, fill this block in `skills/image-studio/config/image-
 ```env
 IMAGE_STUDIO_PROVIDER=runninghub
 IMAGE_STUDIO_BASE_URL=https://www.runninghub.cn
-# FINAL API KEY LOCATION / 最终填写 Running Hub API key 的地方
-IMAGE_STUDIO_API_KEY=replace_with_your_runninghub_api_key
+# API key is stored in macOS Keychain, not in this file.
+IMAGE_STUDIO_API_KEY_SOURCE=keychain
+IMAGE_STUDIO_KEYCHAIN_SERVICE=codex-image-studio
+IMAGE_STUDIO_KEYCHAIN_ACCOUNT=runninghub
 IMAGE_STUDIO_RUNNINGHUB_TEXT_MODEL=/rhart-image-g-2-official/text-to-image
 IMAGE_STUDIO_RUNNINGHUB_EDIT_MODEL=/rhart-image-g-2/image-to-image
 IMAGE_STUDIO_RUNNINGHUB_ASPECT_RATIO=16:9

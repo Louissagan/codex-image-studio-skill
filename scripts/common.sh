@@ -3,15 +3,23 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-PROJECT_ROOT="$(cd "$SKILL_DIR/../.." && pwd)"
+if [[ "$(basename "$SKILL_DIR")" == "image-studio" && "$(basename "$(dirname "$SKILL_DIR")")" == "skills" ]]; then
+  PROJECT_ROOT="$(cd "$SKILL_DIR/../.." && pwd)"
+else
+  PROJECT_ROOT="$SKILL_DIR"
+fi
 BIN_PATH="$SKILL_DIR/bin/gptcodex-image"
 ENV_FILE="$SKILL_DIR/config/image-studio.env"
 EXAMPLE_ENV_FILE="$SKILL_DIR/config/image-studio.example.env"
 CONFIG_SCRIPT="$SKILL_DIR/scripts/configure-env.sh"
+CONFIG_GUI_SCRIPT="$SKILL_DIR/scripts/configure-env-gui.sh"
 
 load_image_studio_env() {
   local shell_base_url="${IMAGE_STUDIO_BASE_URL:-}"
   local shell_api_key="${IMAGE_STUDIO_API_KEY:-}"
+  local shell_api_key_source="${IMAGE_STUDIO_API_KEY_SOURCE:-}"
+  local shell_keychain_service="${IMAGE_STUDIO_KEYCHAIN_SERVICE:-}"
+  local shell_keychain_account="${IMAGE_STUDIO_KEYCHAIN_ACCOUNT:-}"
   local shell_runninghub_api_key="${RUNNINGHUB_API_KEY:-}"
   local shell_provider="${IMAGE_STUDIO_PROVIDER:-}"
   local shell_text_model="${IMAGE_STUDIO_TEXT_MODEL:-}"
@@ -35,6 +43,9 @@ load_image_studio_env() {
 
   IMAGE_STUDIO_BASE_URL="${shell_base_url:-${IMAGE_STUDIO_BASE_URL:-}}"
   IMAGE_STUDIO_API_KEY="${shell_api_key:-${IMAGE_STUDIO_API_KEY:-}}"
+  IMAGE_STUDIO_API_KEY_SOURCE="${shell_api_key_source:-${IMAGE_STUDIO_API_KEY_SOURCE:-}}"
+  IMAGE_STUDIO_KEYCHAIN_SERVICE="${shell_keychain_service:-${IMAGE_STUDIO_KEYCHAIN_SERVICE:-codex-image-studio}}"
+  IMAGE_STUDIO_KEYCHAIN_ACCOUNT="${shell_keychain_account:-${IMAGE_STUDIO_KEYCHAIN_ACCOUNT:-}}"
   IMAGE_STUDIO_PROVIDER="${shell_provider:-${IMAGE_STUDIO_PROVIDER:-auto}}"
   IMAGE_STUDIO_TEXT_MODEL="${shell_text_model:-${IMAGE_STUDIO_TEXT_MODEL:-gpt-4.1}}"
   IMAGE_STUDIO_API_MODE="${shell_api_mode:-${IMAGE_STUDIO_API_MODE:-images}}"
@@ -53,9 +64,17 @@ load_image_studio_env() {
     fi
   fi
 
+  if image_studio_is_placeholder "$IMAGE_STUDIO_API_KEY"; then
+    local keychain_api_key=""
+    keychain_api_key="$(image_studio_read_keychain_api_key || true)"
+    if [[ -n "$keychain_api_key" ]]; then
+      IMAGE_STUDIO_API_KEY="$keychain_api_key"
+    fi
+  fi
+
   if image_studio_is_runninghub; then
     IMAGE_STUDIO_IMAGE_MODEL="${shell_image_model:-${IMAGE_STUDIO_IMAGE_MODEL:-}}"
-    if [[ -z "$shell_image_model" && "${IMAGE_STUDIO_IMAGE_MODEL:-}" == "gpt-image-1" ]]; then
+    if [[ -z "$shell_image_model" && "${IMAGE_STUDIO_IMAGE_MODEL:-}" == gpt-image-* ]]; then
       IMAGE_STUDIO_IMAGE_MODEL=""
     fi
     IMAGE_STUDIO_DEFAULT_SIZE="${shell_default_size:-${IMAGE_STUDIO_DEFAULT_SIZE:-}}"
@@ -67,13 +86,16 @@ load_image_studio_env() {
       IMAGE_STUDIO_DEFAULT_QUALITY=""
     fi
   else
-    IMAGE_STUDIO_IMAGE_MODEL="${shell_image_model:-${IMAGE_STUDIO_IMAGE_MODEL:-gpt-image-1}}"
+    IMAGE_STUDIO_IMAGE_MODEL="${shell_image_model:-${IMAGE_STUDIO_IMAGE_MODEL:-gpt-image-2}}"
     IMAGE_STUDIO_DEFAULT_SIZE="${shell_default_size:-${IMAGE_STUDIO_DEFAULT_SIZE:-1024x1024}}"
     IMAGE_STUDIO_DEFAULT_QUALITY="${shell_default_quality:-${IMAGE_STUDIO_DEFAULT_QUALITY:-high}}"
   fi
 
   export IMAGE_STUDIO_BASE_URL
   export IMAGE_STUDIO_API_KEY
+  export IMAGE_STUDIO_API_KEY_SOURCE
+  export IMAGE_STUDIO_KEYCHAIN_SERVICE
+  export IMAGE_STUDIO_KEYCHAIN_ACCOUNT
   export IMAGE_STUDIO_PROVIDER
   export IMAGE_STUDIO_TEXT_MODEL
   export IMAGE_STUDIO_IMAGE_MODEL
@@ -127,6 +149,30 @@ image_studio_is_placeholder() {
   [[ -z "$value" || "$value" == replace_with_* || "$value" == *_HERE ]]
 }
 
+image_studio_read_keychain_api_key() {
+  local source service account
+  source="$(printf '%s' "${IMAGE_STUDIO_API_KEY_SOURCE:-}" | tr '[:upper:]' '[:lower:]')"
+  service="${IMAGE_STUDIO_KEYCHAIN_SERVICE:-codex-image-studio}"
+  account="${IMAGE_STUDIO_KEYCHAIN_ACCOUNT:-}"
+
+  if [[ -z "$account" ]]; then
+    if image_studio_is_runninghub; then
+      account="runninghub"
+    else
+      account="openai"
+    fi
+  fi
+
+  if [[ "$source" != "keychain" && -z "${IMAGE_STUDIO_KEYCHAIN_ACCOUNT:-}" ]]; then
+    return 1
+  fi
+  if ! command -v security >/dev/null 2>&1; then
+    return 1
+  fi
+
+  security find-generic-password -a "$account" -s "$service" -w 2>/dev/null
+}
+
 require_api_env() {
   if [[ -z "$IMAGE_STUDIO_BASE_URL" ]]; then
     printf '缺少 IMAGE_STUDIO_BASE_URL。请配置 %s\n' "$ENV_FILE" >&2
@@ -148,9 +194,9 @@ print_config_hint() {
 
 print_setup_hint() {
   printf 'Image Studio provider configuration is incomplete.\n'
-  printf 'Final API key location: %s\n' "$ENV_FILE"
+  printf 'Preferred secure setup wizard: bash %s\n' "$CONFIG_GUI_SCRIPT"
   printf 'Interactive setup wizard: bash %s\n' "$CONFIG_SCRIPT"
   printf 'Manual template: cp %s %s\n' "$EXAMPLE_ENV_FILE" "$ENV_FILE"
-  printf 'Then edit the private env file: %s\n' "$ENV_FILE"
+  printf 'Then edit the private env file or use Keychain-backed GUI setup: %s\n' "$ENV_FILE"
   printf 'Then verify: bash %s/scripts/check-env.sh\n' "$SKILL_DIR"
 }

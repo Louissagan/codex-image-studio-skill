@@ -1,4 +1,4 @@
 interface:
   display_name: "Image Studio"
   short_description: "Generate/edit images via Running Hub or relays"
-  default_prompt: "Use $image-studio. First run its environment check and, if credentials are missing, guide me through scripts/configure-env.sh for Running Hub or an OpenAI-compatible relay. Then generate or edit the image and return the saved image, metadata, and raw response paths."
+  default_prompt: "Use $image-studio. First run scripts/install.sh if the wrapper is missing, then run its environment check. If credentials are missing, guide me through scripts/configure-env-gui.sh on macOS/Codex desktop or scripts/configure-env.sh in a terminal for Running Hub or an OpenAI-compatible relay. Then generate or edit the image and return the saved image, metadata, and raw response paths."

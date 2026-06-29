@@ -2,6 +2,7 @@ config/image-studio.env
 config/image-studio.env.backup.*
 bin/
 outputs/
+third_party/
 tmp/
 .DS_Store
 *.log

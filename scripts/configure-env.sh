@@ -17,6 +17,10 @@ Real API keys belong only in that private file or in shell environment
 variables. Never put real keys in:
   $EXAMPLE_ENV_FILE
 
+For macOS/Codex desktop, prefer the GUI + Keychain wizard when you do
+not want API keys written to the private env file:
+  bash skills/image-studio/scripts/configure-env-gui.sh
+
 Usage:
   bash skills/image-studio/scripts/configure-env.sh
 
@@ -173,7 +177,7 @@ write_runninghub_env() {
   aspect_ratio="$(prompt_value 'Default aspect ratio' "$aspect_default")"
   resolution="$(prompt_value 'Default resolution' "$resolution_default")"
   max_wait="$(prompt_value 'Max wait seconds for Running Hub tasks' "$wait_default")"
-  output_dir="$(prompt_value 'Output directory' "${IMAGE_STUDIO_OUTPUT_DIR:-./skills/image-studio/outputs}")"
+  output_dir="$(prompt_value 'Output directory' "${IMAGE_STUDIO_OUTPUT_DIR:-$SKILL_DIR/outputs}")"
 
   {
     printf '# Image Studio private environment. Do not commit this file.\n'
@@ -200,7 +204,7 @@ write_openai_env() {
   local base_default key_default model_default size_default quality_default
   base_default="https://relay.example.com/v1"
   key_default=""
-  model_default="gpt-image-1"
+  model_default="gpt-image-2"
   size_default="1024x1024"
   quality_default="high"
   if existing_config_is_openai; then
@@ -218,7 +222,7 @@ write_openai_env() {
   quality="$(prompt_value 'Default image quality' "$quality_default")"
   timeout_seconds="$(prompt_value 'Request timeout seconds' "${IMAGE_STUDIO_TIMEOUT_SECONDS:-300}")"
   max_retries="$(prompt_value 'Max retries' "${IMAGE_STUDIO_MAX_RETRIES:-2}")"
-  output_dir="$(prompt_value 'Output directory' "${IMAGE_STUDIO_OUTPUT_DIR:-./skills/image-studio/outputs}")"
+  output_dir="$(prompt_value 'Output directory' "${IMAGE_STUDIO_OUTPUT_DIR:-$SKILL_DIR/outputs}")"
 
   {
     printf '# Image Studio private environment. Do not commit this file.\n'
@@ -250,6 +254,8 @@ main() {
   if [[ ! -t 0 || ! -t 1 ]]; then
     printf 'This configuration wizard is interactive. Run it in a terminal:\n' >&2
     printf '  bash %s\n' "$0" >&2
+    printf 'Or use the macOS GUI + Keychain wizard:\n' >&2
+    printf '  bash %s/configure-env-gui.sh\n' "$SCRIPT_DIR" >&2
     printf 'Or copy %s to %s and edit it manually.\n' "$EXAMPLE_ENV_FILE" "$ENV_FILE" >&2
     exit 2
   fi

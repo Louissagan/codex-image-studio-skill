@@ -7,17 +7,19 @@ Use this reference only when debugging Running Hub behavior or adding support fo
 Use the setup wizard for normal installation:
 
 ```bash
-bash skills/image-studio/scripts/configure-env.sh
+bash skills/image-studio/scripts/configure-env-gui.sh
 ```
 
-The final API key location is the private file `skills/image-studio/config/image-studio.env`. Do not put real keys in `config/image-studio.example.env`.
+The preferred API key location is macOS Keychain through `configure-env-gui.sh`. The private file `skills/image-studio/config/image-studio.env` should contain only non-secret provider settings plus Keychain pointers. Do not put real keys in `config/image-studio.example.env`.
 
 Set:
 
 ```env
 IMAGE_STUDIO_PROVIDER=runninghub
 IMAGE_STUDIO_BASE_URL=https://www.runninghub.cn
-IMAGE_STUDIO_API_KEY=RUNNING_HUB_API_KEY_HERE
+IMAGE_STUDIO_API_KEY_SOURCE=keychain
+IMAGE_STUDIO_KEYCHAIN_SERVICE=codex-image-studio
+IMAGE_STUDIO_KEYCHAIN_ACCOUNT=runninghub
 IMAGE_STUDIO_RUNNINGHUB_TEXT_MODEL=/rhart-image-g-2-official/text-to-image
 IMAGE_STUDIO_RUNNINGHUB_EDIT_MODEL=/rhart-image-g-2/image-to-image
 ```

@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ " ${*:-} " == *" --help "* || " ${*:-} " == *" -h "* ]]; then
   cat <<'USAGE'
-Usage: bash skills/image-studio/scripts/generate-image.sh --prompt "..." [--size 1024x1024] [--quality high] [--model gpt-image-1|/rhart-image-g-2-official/text-to-image] [--aspect-ratio 16:9] [--resolution 1k] [--output-dir ./skills/image-studio/outputs]
+Usage: bash skills/image-studio/scripts/generate-image.sh --prompt "..." [--size 1024x1024] [--quality high] [--model gpt-image-2|/rhart-image-g-2-official/text-to-image] [--aspect-ratio 16:9] [--resolution 1k] [--output-dir ./skills/image-studio/outputs]
 USAGE
   exit 0
 fi
@@ -44,7 +44,7 @@ while [[ $# -gt 0 ]]; do
     --no-raw) raw="false"; shift ;;
     -h|--help)
       cat <<'USAGE'
-Usage: bash skills/image-studio/scripts/generate-image.sh --prompt "..." [--size 1024x1024] [--quality high] [--model gpt-image-1|/rhart-image-g-2-official/text-to-image] [--aspect-ratio 16:9] [--resolution 1k] [--output-dir ./skills/image-studio/outputs]
+Usage: bash skills/image-studio/scripts/generate-image.sh --prompt "..." [--size 1024x1024] [--quality high] [--model gpt-image-2|/rhart-image-g-2-official/text-to-image] [--aspect-ratio 16:9] [--resolution 1k] [--output-dir ./skills/image-studio/outputs]
 USAGE
       exit 0
       ;;

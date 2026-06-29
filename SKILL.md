@@ -21,26 +21,31 @@ Install or refresh the local CLI wrapper before first use:
 bash skills/image-studio/scripts/install.sh
 ```
 
+The installer creates output directories, creates a private env template when missing, installs or upgrades Go with Homebrew when Go is missing or older than the wrapper's `go.mod` requirement, builds the local wrapper, and then runs `check-env.sh`. Automatic Go installation is enabled by default with `IMAGE_STUDIO_AUTO_INSTALL_GO=1`. On macOS, if Homebrew is missing, the installer stops with instructions unless the user explicitly opts in with `IMAGE_STUDIO_AUTO_INSTALL_HOMEBREW=1`.
+
 After install, guide the user through provider setup when `check-env.sh` reports missing values:
 
 ```bash
+bash skills/image-studio/scripts/configure-env-gui.sh
 bash skills/image-studio/scripts/configure-env.sh
 bash skills/image-studio/scripts/check-env.sh
 ```
 
-If the shell is not interactive, tell the user to copy `skills/image-studio/config/image-studio.example.env` to `skills/image-studio/config/image-studio.env`, edit the private file, then run `check-env.sh`. Never hardcode API keys. Prefer the private env file or shell environment variables; the scripts load `skills/image-studio/config/image-studio.env` when it exists.
+On macOS/Codex desktop, prefer `configure-env-gui.sh`: it uses system dialogs, hides the API key input, and stores keys in macOS Keychain by default. If GUI setup is unavailable, use `configure-env.sh` in a real terminal; it hides typed keys but writes them to the private env file. If the shell is not interactive, tell the user to copy `skills/image-studio/config/image-studio.example.env` to `skills/image-studio/config/image-studio.env`, edit the private file, then run `check-env.sh`. Never ask the user to paste API keys into chat. Never hardcode API keys. Prefer macOS Keychain or shell environment variables over storing keys in files; the scripts load `skills/image-studio/config/image-studio.env` when it exists.
 
 ## Provider Configuration
 
-The final place to fill any provider key is the private file `skills/image-studio/config/image-studio.env`. The install/check scripts print this path, and `configure-env.sh` writes it directly. Never put a real key in `config/image-studio.example.env` or in this skill documentation.
+The preferred provider key location is macOS Keychain via `configure-env-gui.sh`. The private file `skills/image-studio/config/image-studio.env` may contain non-secret provider settings plus Keychain pointers such as `IMAGE_STUDIO_API_KEY_SOURCE=keychain`, `IMAGE_STUDIO_KEYCHAIN_SERVICE=codex-image-studio`, and `IMAGE_STUDIO_KEYCHAIN_ACCOUNT=openai`. Only use `IMAGE_STUDIO_API_KEY` in the private env file when the user explicitly accepts plaintext-at-rest storage. Never put a real key in `config/image-studio.example.env` or in this skill documentation.
 
 For an OpenAI-compatible relay provider (中转站), configure all of these in `image-studio.env`:
 
 ```env
 IMAGE_STUDIO_PROVIDER=openai
 IMAGE_STUDIO_BASE_URL=https://relay.example.com/v1
-IMAGE_STUDIO_API_KEY=RELAY_API_KEY_HERE
-IMAGE_STUDIO_IMAGE_MODEL=gpt-image-1
+IMAGE_STUDIO_API_KEY_SOURCE=keychain
+IMAGE_STUDIO_KEYCHAIN_SERVICE=codex-image-studio
+IMAGE_STUDIO_KEYCHAIN_ACCOUNT=openai
+IMAGE_STUDIO_IMAGE_MODEL=gpt-image-2
 IMAGE_STUDIO_DEFAULT_SIZE=1024x1024
 IMAGE_STUDIO_DEFAULT_QUALITY=high
 IMAGE_STUDIO_TIMEOUT_SECONDS=300
@@ -56,7 +61,9 @@ Use Running Hub when OpenAI-compatible relay image generation is unstable or whe
 ```env
 IMAGE_STUDIO_PROVIDER=runninghub
 IMAGE_STUDIO_BASE_URL=https://www.runninghub.cn
-IMAGE_STUDIO_API_KEY=RUNNING_HUB_API_KEY_HERE
+IMAGE_STUDIO_API_KEY_SOURCE=keychain
+IMAGE_STUDIO_KEYCHAIN_SERVICE=codex-image-studio
+IMAGE_STUDIO_KEYCHAIN_ACCOUNT=runninghub
 IMAGE_STUDIO_RUNNINGHUB_TEXT_MODEL=/rhart-image-g-2-official/text-to-image
 IMAGE_STUDIO_RUNNINGHUB_EDIT_MODEL=/rhart-image-g-2/image-to-image
 IMAGE_STUDIO_RUNNINGHUB_ASPECT_RATIO=16:9
